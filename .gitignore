@@ -1,0 +1,16 @@
+Thumbs.db
+*.exe
+*.dll
+*.old
+*.bak
+*.cache
+*.log
+*.txt
+
+*.nes
+*.bin
+*.zip
+
+Release/*
+Old/*
+Test/*
