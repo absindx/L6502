@@ -1627,15 +1627,16 @@ function L6502.new(MemoryProvider, TraceLogProvider)
 			self.Registers.S	= 0xFD
 			self.Registers.P	= 0x34	-- nvRBdIzc
 
-			self.PendingReset	= false;
+			self.PendingReset	= false
 		elseif(self.PendingIrq)then
 			internalInterrupt(0xFFFE, false)
+			self.PendingIrq		= false
 		elseif(self.PendingBrk)then
 			internalInterrupt(0xFFFE, true)
-			self.PendingBrk		= false;
+			self.PendingBrk		= false
 		elseif(self.PendingNmi)then
 			internalInterrupt(0xFFFA, false)
-			self.PendingNmi		= false;
+			self.PendingNmi		= false
 		end
 	end
 	function status:Clock()
