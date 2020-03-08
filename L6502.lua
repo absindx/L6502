@@ -1584,8 +1584,8 @@ function L6502.new(MemoryProvider, TraceLogProvider)
 	status.AfterInterruptCheck	= true
 
 	function status:Reset()
-		status.CycleCounter	= 0
-		status.WaitCycleCounter	= 0
+		self.CycleCounter	= 0
+		self.WaitCycleCounter	= 0
 		self.Halt		= false
 		self.PendingReset	= true
 	end
@@ -1631,38 +1631,46 @@ function L6502.new(MemoryProvider, TraceLogProvider)
 		elseif(self.PendingIrq)then
 			internalInterrupt(0xFFFE, false)
 			self.PendingIrq		= false
+			self.WaitCycleCounter	= 7
 		elseif(self.PendingBrk)then
 			internalInterrupt(0xFFFE, true)
 			self.PendingBrk		= false
 		elseif(self.PendingNmi)then
 			internalInterrupt(0xFFFA, false)
 			self.PendingNmi		= false
+			self.WaitCycleCounter	= 7
 		end
 	end
 	function status:Clock()
 		-- Instruction waiting
-		if(not CheckStatus(self))then
+		if(not CheckStatus(self))then	-- halt or memory not connected
 			self.CycleCounter	= self.CycleCounter + 1
 			return
 		end
 
+		-- Interrupt
 		if(self.WaitCycleCounter <= 0)then
 			self:InterruptBypass()
+		end
 
-			-- Normal
+		-- Normal instruction
+		if(self.WaitCycleCounter <= 0)then
 			ExecuteInstruction(self)
 		end
+
+		-- Increment counter
 		self.CycleCounter	= self.CycleCounter + 1
 		self.WaitCycleCounter	= self.WaitCycleCounter - 1
 
+		-- After interrupt
 		if(self.AfterInterruptCheck and (self.WaitCycleCounter <= 0))then
 			self:InterruptBypass()
 		end
 	end
 	function status:Step()
 		repeat
-			status:Clock()
-		until(status.WaitCycleCounter <= 0)
+			self:Clock()
+		until(self.WaitCycleCounter <= 0)
 	end
 
 	function status.Registers:GetStringStatus()
