@@ -1,7 +1,8 @@
 local L6502		= require("L6502")
 local L6502Memory_NES	= require("L6502Memory_NES")
 
-local baseDir	= [[kevtris\]]
+local baseDir		= [[kevtris\]]
+local enableTrace	= false
 
 function ExecuteTest(romFile)
 	memory	= L6502Memory_NES.ReadFromNesRomFile(baseDir .. romFile)
@@ -15,13 +16,27 @@ function ExecuteTest(romFile)
 
 	local executing	= 0
 
-	local fp	= io.open(romFile .. ".log", "w")
-	if(not fp)then
-		print("Failed to create the result file")
-		return
+	local fp
+	local enableLog	= true
+	if(enableTrace)then
+		fp	= io.open(romFile .. ".log", "w")
+		if(not fp)then
+			print("Failed to create the result file")
+			return
+		end
+		function fputs(str)
+			if(enableLog)then
+				fp:write(str .. "\n")
+			end
+		end
+	else
+		function fputs()
+		end
 	end
-	function fputs(str)
-		fp:write(str .. "\n")
+	function LogMessage(format, ...)
+		local str	= string.format(format, ...)
+		print(str)
+		fputs(str)
 	end
 
 	function memory:Read(address)
@@ -78,9 +93,7 @@ function ExecuteTest(romFile)
 						}
 						local testNamesIndex	= math.floor((ppuAddr - 0x2060) / 0x20)
 						if((0 < testNamesIndex) and (testNamesIndex < #testNames))then
-							resultString	= string.format("; Result : %s%s %s", resultString, string.char(value), testNames[testNamesIndex])
-							print(resultString)
-							fputs(resultString)
+							LogMessage("; Result : %s%s %s", resultString, string.char(value), testNames[testNamesIndex])
 						end
 					end
 				end
@@ -113,14 +126,16 @@ function ExecuteTest(romFile)
 		end
 
 		-- V-Blank
-		if(((cpu.CycleCounter * 3 + 30 + 241 * 262) % (341 * 262)) < 3)then	-- 89342 ppu cycles
+		if(((cpu.CycleCounter * 3 + 30 + 241 * 262) % (341 * 262 - 0.5)) < 3)then	-- 89341.5 ppu cycles
 			fputs(string.format("; NMI Cycle=%d", cpu.CycleCounter))
 			cpu:NMI()
 		end
 	end
 
-	fp:close()
-	memory:WriteToFile(romFile .. ".bin")
+	if(enableTrace)then
+		fp:close()
+		memory:WriteToFile(romFile .. ".bin")
+	end
 end
 
 ExecuteTest("nestest.nes")

@@ -2,7 +2,8 @@ local L6502		= require("L6502")
 local L6502Memory_NES	= require("L6502Memory_NES")
 local L6502Disassembler	= require("L6502Disassembler")
 
-local baseDir	= [[cpu_timing_test6\]]
+local baseDir		= [[cpu_timing_test6\]]
+local enableTrace	= false
 
 function ExecuteTest(romFile)
 	memory	= L6502Memory_NES.ReadFromNesRomFile(baseDir .. romFile)
@@ -16,15 +17,21 @@ function ExecuteTest(romFile)
 
 	local executing	= 0
 
-	local fp	= io.open(romFile .. ".log", "w")
-	if(not fp)then
-		print("Failed to create the result file")
-		return
-	end
+	local fp
 	local enableLog	= true
-	function fputs(str)
-		if(enableLog)then
-			fp:write(str .. "\n")
+	if(enableTrace)then
+		fp	= io.open(romFile .. ".log", "w")
+		if(not fp)then
+			print("Failed to create the result file")
+			return
+		end
+		function fputs(str)
+			if(enableLog)then
+				fp:write(str .. "\n")
+			end
+		end
+	else
+		function fputs()
 		end
 	end
 	function LogMessage(format, ...)
@@ -85,7 +92,7 @@ function ExecuteTest(romFile)
 		end
 
 		-- V-Blank
-		if(((cpu.CycleCounter * 3 + 30 + 241 * 262) % (341 * 262)) < 3)then	-- 89342 ppu cycles
+		if(((cpu.CycleCounter * 3 + 30 + 241 * 262) % (341 * 262 - 0.5)) < 3)then	-- 89341.5 ppu cycles
 			fputs(string.format("; NMI Cycle=%d", cpu.CycleCounter))
 			cpu.TraceLogProvider	= fputs
 			waitVBlank		= 0
@@ -93,8 +100,10 @@ function ExecuteTest(romFile)
 		end
 	end
 
-	fp:close()
-	memory:WriteToFile(romFile .. ".bin")
+	if(enableTrace)then
+		fp:close()
+		memory:WriteToFile(romFile .. ".bin")
+	end
 end
 
 ExecuteTest("cpu_timing_test.nes")
