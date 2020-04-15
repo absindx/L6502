@@ -67,8 +67,9 @@ function L6502Interpreter.new()
 	end
 
 	function interpreter:Reset()
-		addCodeHistory(interpreter, "	.org $8000")
-		interpreter.cpu:Reset()
+		local address	= self.memory:ReadBypass(0xFFFD) * 256 + self.memory:ReadBypass(0xFFFC)
+		addCodeHistory(self, string.format("	.org $%04X", address))
+		self.cpu:Reset()
 	end
 	function interpreter:Interpret(code)
 		local origin	= self:GetProgramCounter()
