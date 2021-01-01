@@ -4,7 +4,7 @@ L6502 is a 6502 library implemented in Lua.
 Undefined instructions are not implemented. (Because the instructions differ from chip to chip)  
 
 ## Environment  
-Supports Lua 5.1 to 5.3 and LuaJIT 2.0.  
+Supports Lua 5.1 to 5.4 and LuaJIT 2.0.  
 
 ## Including  
 * [CPU Emulator](L6502.lua)  
@@ -22,7 +22,7 @@ local L6502Memory	= require("L6502Memory")
 -- Create memory
 memory	= L6502Memory.new()
 memory:Upload(0xFFFA, {0x00, 0x80, 0x00, 0x90, 0x00, 0xA0})	-- Interrupt handler
-memory:Upload(0x9000, {0xEA})	-- Program code (Reset : NOP)
+memory:Upload(0x9000, {0xEA})	-- Program code (Reset: NOP)
 
 -- Create cpu
 cpu	= L6502.new(memory, print)	-- print is a function that displays the trace log
@@ -34,8 +34,9 @@ cpu:Clock()	-- Execute instruction
 		--   need to call cpu:Clock() for the currently executing instruction cycle.
 		--   cpu:Step() advances the clock to the next instruction in one call.
 
--- Output:
--- NOP             ; PC=9000, A=00, X=00, Y=00, S=FD, P=34 nvRBdIzc, Cycle=0
+--[[ Output:
+NOP             ; PC=9000, A=00, X=00, Y=00, S=FD, P=34 nvRBdIzc, Cycle=0
+]]
 ```
 
 See also [Sample](Sample/) directory.  
@@ -49,7 +50,8 @@ Set `cpu.DisableDecimalMode` to `true` to ignore the D flag.
 * CPU : Cycle accurate (probably remake)  
 * Assembler : `.include` directive  
 * Assembler : `.if` directive  
-* Interpreter : `load` command  
+* Interpreter : `loadbin` command  
+* Interpreter : breakpoint commands  
 
 ## License  
 [MIT License](LICENSE).  

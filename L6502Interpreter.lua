@@ -53,6 +53,24 @@ function L6502Interpreter.new()
 	local function addCodeHistory(interpreter, code)
 		interpreter.code[#interpreter.code + 1]	= string.match(code, ".*[^\n]")
 	end
+	local function setOriginToHistory(interpreter)
+		addCodeHistory(interpreter, string.format("	.org $%04X", interpreter:GetProgramCounter()))
+	end
+	local function assemble(interpreter, code)
+		local origin	= interpreter:GetProgramCounter()
+		local bin	= L6502Assembler.Assemble(code, origin)
+		if(not bin)then
+			print("[Error] Failed to assemble.")
+			return
+		end
+		if(#bin > 1)then
+			print("[Warning] Program is divided.")
+		end
+
+		L6502Assembler.UploadToMemory(interpreter.memory, bin)
+
+		return bin
+	end
 
 	interpreter.memory		= L6502Memory.new()
 	interpreter.cpu			= L6502.new(interpreter.memory, print)
@@ -67,36 +85,61 @@ function L6502Interpreter.new()
 	end
 
 	function interpreter:Reset()
-		local address	= self.memory:ReadBypass(0xFFFD) * 256 + self.memory:ReadBypass(0xFFFC)
-		addCodeHistory(self, string.format("	.org $%04X", address))
+		self.LastExecutedAddress	= -1
 		self.cpu:Reset()
 	end
 	function interpreter:Interpret(code)
 		local origin	= self:GetProgramCounter()
-		local bin	= L6502Assembler.Assemble(code, origin)
+		local bin	= assemble(self, code)
 		if(not bin)then
-			print("[Error] Failed to assemble.")
 			return
 		end
-		if(#bin > 1)then
-			print("[Warning] Program is divided.")
-		end
 
+		if(origin ~= self.LastExecutedAddress)then
+			setOriginToHistory(self)
+		end
 		addCodeHistory(self, code)
 
 		if(#bin[1].Data > 0)then
 			local nextOrigin	= origin + #bin[1].Data
-			L6502Assembler.UploadToMemory(self.memory, bin)
 			self.cpu:Step()
 
 			if(nextOrigin ~= self:GetProgramCounter())then
-				addCodeHistory(self, string.format("	.org $%04X", self:GetProgramCounter()))
+				setOriginToHistory(self)
 			end
 		end
+
+		self.LastExecutedAddress	= self:GetProgramCounter()
 	end
 
 	function interpreter:GetHistory()
 		return table.concat(self.code, "\n")
+	end
+	function interpreter:LoadAsmFromFile(file)
+		local fp	= io.open(file, "r")
+		if(not fp)then
+			print("[Error] Failed to open the file.")
+			return
+		end
+
+		local code	= fp:read("*a")
+		fp:close()
+
+		local origin	= self:GetProgramCounter()
+		local bin	= assemble(self, code)
+		if(not bin)then
+			return
+		end
+
+		if(origin ~= self.LastExecutedAddress)then
+			setOriginToHistory(self)
+		end
+		addCodeHistory(self, ";--------------------------------------------------")
+		addCodeHistory(self, "; loadasm " .. file)
+		addCodeHistory(self, code)
+		addCodeHistory(self, ";--------------------------------------------------")
+
+		self.LastExecutedAddress	= -1
 	end
 	function interpreter:WriteHistoryToFile(file)
 		local fp	= io.open(file, "w")
@@ -153,6 +196,14 @@ function L6502Interpreter.Prompt()
 	function commands.reset(args)
 		interpreter:Reset()
 	end
+	function commands.loadasm(args)
+		local file	= args[1]
+		if(not file)then
+			io.write("file	> ")
+			file	= io.read()
+		end
+		interpreter:LoadAsmFromFile(file)
+	end
 	function commands.save(args)
 		local file	= args[1]
 		if(not file)then
@@ -173,6 +224,8 @@ function L6502Interpreter.Prompt()
 		print("Commands")
 		description("dump [address (hex)]",	"Display memory dump")
 		description("step [count=1]",		"Step instruction")
+		description("reset",			"Reset CPU")
+		description("loadasm [file]",		"Load asm source from file")
 		description("save [file]",		"Save history to file")
 		description("exit",			"Exit prompt mode")
 		description("help",			"Show help")
