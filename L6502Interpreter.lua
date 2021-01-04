@@ -53,11 +53,12 @@ function L6502Interpreter.new()
 	local function addCodeHistory(interpreter, code)
 		interpreter.code[#interpreter.code + 1]	= string.match(code, ".*[^\n]")
 	end
-	local function setOriginToHistory(interpreter)
-		addCodeHistory(interpreter, string.format("	.org $%04X", interpreter:GetProgramCounter()))
+	local function setOriginToHistory(interpreter, address)
+		address	= address	or interpreter:GetProgramCounter()
+		addCodeHistory(interpreter, string.format("	.org $%04X", address))
 	end
-	local function assemble(interpreter, code)
-		local origin	= interpreter:GetProgramCounter()
+	local function assemble(interpreter, code, origin)
+		origin		= origin	or interpreter:GetProgramCounter()
 		local bin	= L6502Assembler.Assemble(code, origin)
 		if(not bin)then
 			print("[Error] Failed to assemble.")
@@ -115,7 +116,8 @@ function L6502Interpreter.new()
 	function interpreter:GetHistory()
 		return table.concat(self.code, "\n")
 	end
-	function interpreter:LoadAsmFromFile(file)
+	function interpreter:LoadAsmFromFile(file, address)
+		address	= address	or self:GetProgramCounter()
 		local fp	= io.open(file, "r")
 		if(not fp)then
 			print("[Error] Failed to open the file.")
@@ -125,17 +127,64 @@ function L6502Interpreter.new()
 		local code	= fp:read("*a")
 		fp:close()
 
-		local origin	= self:GetProgramCounter()
-		local bin	= assemble(self, code)
+		local bin	= assemble(self, code, address)
 		if(not bin)then
 			return
 		end
 
-		if(origin ~= self.LastExecutedAddress)then
-			setOriginToHistory(self)
-		end
 		addCodeHistory(self, ";--------------------------------------------------")
 		addCodeHistory(self, "; loadasm " .. file)
+		if(address ~= self.LastExecutedAddress)then
+			setOriginToHistory(self, address)
+		end
+		addCodeHistory(self, code)
+		addCodeHistory(self, ";--------------------------------------------------")
+
+		self.LastExecutedAddress	= -1
+	end
+	function interpreter:LoadBinaryFromFile(file, address)
+		address	= address	or self:GetProgramCounter()
+
+		local fp	= io.open(file, "rb")
+		if(not fp)then
+			print("[Error] Failed to open the file.")
+			print("Address range exceeded 0x10000, stop writing at 0xFFFF.")
+			return
+		end
+
+		local data	= fp:read("*a")
+		fp:close()
+
+		local bin	= {string.byte(data, 1, #data)}
+		local code	= ""
+		local binLength	= #bin
+		local format	= string.format
+
+		self.memory:Upload(address, bin)
+
+		for i=1,binLength,16 do
+			local line	= "\n	.db "
+			local length	= binLength - (i - 1)
+			if(length > 16)then
+				length	= 16
+			end
+
+			if(length > 0)then
+				for j=1,length do
+					line	= format("%s$%02X, ", line, bin[i + j - 1])
+				end
+
+				code	= code .. string.sub(line, 1, #line - 2)
+			end
+		end
+
+		code	= string.sub(code, 2)	-- remove first newline
+
+		addCodeHistory(self, ";--------------------------------------------------")
+		addCodeHistory(self, "; loadbin " .. file)
+		if(address ~= self.LastExecutedAddress)then
+			setOriginToHistory(self, address)
+		end
 		addCodeHistory(self, code)
 		addCodeHistory(self, ";--------------------------------------------------")
 
@@ -198,11 +247,22 @@ function L6502Interpreter.Prompt()
 	end
 	function commands.loadasm(args)
 		local file	= args[1]
+		local address	= tonumber(args[2] or "", 16)
 		if(not file)then
 			io.write("file	> ")
 			file	= io.read()
 		end
-		interpreter:LoadAsmFromFile(file)
+		interpreter:LoadAsmFromFile(file, address)
+	end
+	function commands.loadbin(args)
+		local file	= args[1]
+		local address	= tonumber(args[2] or "", 16)
+		if(not file)then
+			io.write("file	> ")
+			file	= io.read()
+		end
+
+		interpreter:LoadBinaryFromFile(file, address)
 	end
 	function commands.save(args)
 		local file	= args[1]
@@ -217,18 +277,19 @@ function L6502Interpreter.Prompt()
 	end
 	function commands.help(args)
 		local function description(name, text)
-			print(string.format("  %-24s: %s", name, text))
+			print(string.format("  %-36s: %s", name, text))
 		end
 		print("Command format")
 		print("  command [argument, ...]")
 		print("Commands")
-		description("dump [address (hex)]",	"Display memory dump")
-		description("step [count=1]",		"Step instruction")
-		description("reset",			"Reset CPU")
-		description("loadasm [file]",		"Load asm source from file")
-		description("save [file]",		"Save history to file")
-		description("exit",			"Exit prompt mode")
-		description("help",			"Show help")
+		description("dump <address (hex)>",			"Display memory dump")
+		description("step [count=1]",				"Step instruction")
+		description("reset",					"Reset CPU")
+		description("loadasm <file>",				"Load asm source from file")
+		description("loadbin <file> [address (hex)=pc]",	"Load binary data from file")
+		description("save <file>",				"Save history to file")
+		description("exit",					"Exit prompt mode")
+		description("help",					"Show help")
 	end
 
 	while(not isExit)do

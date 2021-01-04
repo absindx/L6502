@@ -50,7 +50,6 @@ Set `cpu.DisableDecimalMode` to `true` to ignore the D flag.
 * CPU : Cycle accurate (probably remake)  
 * Assembler : `.include` directive  
 * Assembler : `.if` directive  
-* Interpreter : `loadbin` command  
 * Interpreter : breakpoint commands  
 
 ## License  
