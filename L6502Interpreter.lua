@@ -148,7 +148,6 @@ function L6502Interpreter.new()
 		local fp	= io.open(file, "rb")
 		if(not fp)then
 			print("[Error] Failed to open the file.")
-			print("Address range exceeded 0x10000, stop writing at 0xFFFF.")
 			return
 		end
 
@@ -159,6 +158,11 @@ function L6502Interpreter.new()
 		local code	= ""
 		local binLength	= #bin
 		local format	= string.format
+
+		if((address + binLength) > 0x10000)then
+			print("[Warning] Address range exceeded 0x10000, stop writing at 0xFFFF.")
+			binLength	= 0x10000 - address
+		end
 
 		self.memory:Upload(address, bin)
 
